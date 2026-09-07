@@ -1,98 +1,139 @@
-// popup.js
-//
-// Runs when the user clicks the toolbar icon. Everything here is scoped
-// to the currently active tab -- there is no "enable globally" path.
-
-const statusEl = document.getElementById("status");
-const buttonEl = document.getElementById("toggle");
-const errorEl = document.getElementById("error");
-
 let currentTab = null;
 
-function showError(msg) {
-  errorEl.textContent = msg;
+const statusEl = document.getElementById("status");
+const toggleButton = document.getElementById("toggle");
+const errorEl = document.getElementById("error");
+
+function showError(message) {
+  errorEl.textContent = message;
   errorEl.hidden = false;
 }
 
 function clearError() {
-  errorEl.hidden = true;
   errorEl.textContent = "";
+  errorEl.hidden = true;
 }
 
-function tabOriginPattern(url) {
-  const origin = new URL(url).origin; // e.g. https://bugzilla.example.com
-  return origin + "/*";
+function setButton(enabled) {
+  toggleButton.disabled = false;
+  toggleButton.textContent = enabled ? "Disable" : "Enable";
 }
 
-async function render() {
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+async function loadState() {
+  clearError();
+
+  const tabs = await browser.tabs.query({
+    active: true,
+    currentWindow: true
+  });
+
   currentTab = tabs[0];
 
-  if (!currentTab || !currentTab.url || !/^https?:/.test(currentTab.url)) {
+  if (!currentTab || !currentTab.id || !currentTab.url) {
     statusEl.textContent = "This page can't be monitored.";
-    buttonEl.hidden = true;
+    toggleButton.disabled = true;
     return;
   }
 
-  const { enabled } = await browser.runtime.sendMessage({
-    type: "getState",
-    tabId: currentTab.id,
-  });
-
-  if (enabled) {
-    statusEl.textContent = "Enabled for this tab.";
-    buttonEl.textContent = "Disable";
-    buttonEl.className = "disable";
-  } else {
-    statusEl.textContent = "Off for this tab (default).";
-    buttonEl.textContent = "Enable";
-    buttonEl.className = "";
-  }
-  buttonEl.disabled = false;
-}
-
-async function onToggleClick() {
-  clearError();
-  buttonEl.disabled = true;
-
-  const { enabled } = await browser.runtime.sendMessage({
-    type: "getState",
-    tabId: currentTab.id,
-  });
-
-  if (enabled) {
-    await browser.runtime.sendMessage({ type: "disableTab", tabId: currentTab.id });
-    await render();
+  if (!/^https?:\/\//i.test(currentTab.url)) {
+    statusEl.textContent = "This page can't be monitored.";
+    toggleButton.disabled = true;
     return;
   }
 
-  // Enabling: request host permission scoped to just this tab's origin.
-  // This call happens directly inside the click handler so it counts as
-  // a user gesture, which Firefox requires for permissions.request.
-  const origin = tabOriginPattern(currentTab.url);
-  let granted = false;
   try {
-    granted = await browser.permissions.request({ origins: [origin] });
-  } catch (err) {
-    showError("Permission request failed: " + err.message);
-    buttonEl.disabled = false;
-    return;
+    const state = await browser.runtime.sendMessage({
+      type: "getState",
+      tabId: currentTab.id
+    });
+
+    if (state && state.enabled) {
+      statusEl.textContent = "Enabled for this tab.";
+      setButton(true);
+    } else {
+      statusEl.textContent = "Off for this tab (default).";
+      setButton(false);
+    }
+  } catch (error) {
+    showError(error.message || String(error));
+    toggleButton.disabled = true;
   }
-
-  if (!granted) {
-    showError("Permission was not granted, so the counter can't run here.");
-    buttonEl.disabled = false;
-    return;
-  }
-
-  await browser.runtime.sendMessage({
-    type: "enableTab",
-    tabId: currentTab.id,
-    origin,
-  });
-
-  await render();
 }
 
-buttonEl.addEventListener("click", onToggleClick);
-render();
+
+/*
+ * IMPORTANT:
+ * The permissions.request() call must happen directly
+ * inside the click handler, before any await.
+ */
+toggleButton.addEventListener("click", function () {
+  clearError();
+
+  if (!currentTab || !currentTab.id || !currentTab.url) {
+    showError("Unable to determine the current tab.");
+    return;
+  }
+
+  const currentlyEnabled =
+    toggleButton.textContent.trim().toLowerCase() === "disable";
+
+  if (currentlyEnabled) {
+    browser.runtime.sendMessage({
+      type: "disableTab",
+      tabId: currentTab.id
+    }).then(() => {
+      statusEl.textContent = "Off for this tab.";
+      setButton(false);
+    }).catch((error) => {
+      showError(error.message || String(error));
+    });
+
+    return;
+  }
+
+  let origin;
+
+  try {
+    origin = new URL(currentTab.url).origin;
+  } catch (error) {
+    showError("Invalid tab URL.");
+    return;
+  }
+
+  const permissionOrigin = origin + "/*";
+
+  /*
+   * This is intentionally NOT awaited.
+   * Firefox requires permissions.request() to be
+   * called directly from the user click handler.
+   */
+  browser.permissions.request({
+    origins: [permissionOrigin]
+  }).then((granted) => {
+    if (!granted) {
+      showError("Permission was not granted.");
+      return;
+    }
+
+    return browser.runtime.sendMessage({
+      type: "enableTab",
+      tabId: currentTab.id,
+      origin: origin
+    });
+  }).then((result) => {
+    if (!result) {
+      return;
+    }
+
+    statusEl.textContent = "Enabled for this tab.";
+    setButton(true);
+  }).catch((error) => {
+    showError(error.message || String(error));
+  });
+});
+
+
+loadState().catch((error) => {
+  showError(error.message || String(error));
+  toggleButton.disabled = true;
+});

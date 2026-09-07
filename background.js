@@ -1,164 +1,294 @@
 // background.js
 //
-// Responsibilities:
-//   - Track which tabs have the counter ENABLED (per-tab, never global).
-//   - Only after the user explicitly enables a tab, hold a *scoped* host
-//     permission for that tab's origin (requested via permissions.request
-//     in popup.js, which runs in direct response to the Enable click).
-//   - Re-inject content.js into an enabled tab whenever that tab finishes
-//     loading again (covers Bugzilla's own periodic full-page reload, and
-//     normal manual refreshes), so the user never has to re-click Enable.
-//   - Never inject into any tab that wasn't explicitly enabled.
+// Keeps the NEW counter enabled on a specific tab across page reloads.
+// The counter is still disabled by default and only starts after the
+// user explicitly enables the current tab.
 
 const STORAGE_KEY = "enabledTabs"; // { [tabId]: { origin: string } }
+
 
 async function getEnabledTabs() {
   const data = await browser.storage.session.get(STORAGE_KEY);
   return data[STORAGE_KEY] || {};
 }
 
+
 async function setEnabledTabs(map) {
-  await browser.storage.session.set({ [STORAGE_KEY]: map });
+  await browser.storage.session.set({
+    [STORAGE_KEY]: map
+  });
 }
+
 
 async function markTabEnabled(tabId, origin) {
   const map = await getEnabledTabs();
-  map[tabId] = { origin };
+
+  map[tabId] = {
+    origin: origin
+  };
+
   await setEnabledTabs(map);
 }
+
 
 async function markTabDisabled(tabId) {
   const map = await getEnabledTabs();
+
   delete map[tabId];
+
   await setEnabledTabs(map);
 }
 
+
 async function isTabEnabled(tabId) {
   const map = await getEnabledTabs();
+
   return Object.prototype.hasOwnProperty.call(map, tabId);
 }
+
 
 async function injectContentScript(tabId) {
   try {
     await browser.scripting.executeScript({
-      target: { tabId },
-      files: ["content.js"],
+      target: {
+        tabId: tabId
+      },
+      files: [
+        "content.js"
+      ]
     });
   } catch (err) {
-    // Tab may have navigated away / closed / be a privileged page. Not fatal.
-    console.warn("Bugzilla NEW Counter: injection failed for tab", tabId, err);
+    console.warn(
+      "Bugzilla Counter: injection failed for tab",
+      tabId,
+      err
+    );
   }
 }
 
+
+/*
+ * Compare the saved origin with the current tab URL.
+ */
 function originMatchesTabUrl(origin, tabUrl) {
   try {
     const tabOrigin = new URL(tabUrl).origin;
-    // origin is stored as "https://host/*" style pattern; compare the host part.
-    const originHost = origin.replace(/\/\*$/, "");
-    return tabOrigin === originHost;
+
+    return tabOrigin === origin;
   } catch {
     return false;
   }
 }
 
-// ---- Message handling from popup.js and content.js ----
+
+/*
+ * Convert:
+ *
+ *   http://cb.inhouse.net
+ *
+ * into:
+ *
+ *   http://cb.inhouse.net/*
+ *
+ * because Firefox host permissions use match patterns.
+ */
+function getPermissionPattern(origin) {
+  if (origin.endsWith("/*")) {
+    return origin;
+  }
+
+  return origin + "/*";
+}
+
+
+// ------------------------------------------------------------
+// Messages from popup.js and content.js
+// ------------------------------------------------------------
+
 browser.runtime.onMessage.addListener(async (message, sender) => {
-  if (!message || typeof message !== "object") return;
+  if (!message || typeof message !== "object") {
+    return;
+  }
 
   switch (message.type) {
+
     case "getState": {
       const enabled = await isTabEnabled(message.tabId);
-      return { enabled };
+
+      return {
+        enabled: enabled
+      };
     }
+
 
     case "enableTab": {
-      const { tabId, origin } = message;
+      const tabId = message.tabId;
+      const origin = message.origin;
+
       await markTabEnabled(tabId, origin);
+
       await injectContentScript(tabId);
-      return { ok: true };
+
+      return {
+        ok: true
+      };
     }
+
 
     case "disableTab": {
-      const { tabId } = message;
+      const tabId = message.tabId;
+
       await markTabDisabled(tabId);
+
       try {
-        await browser.tabs.sendMessage(tabId, { type: "disable" });
+        await browser.tabs.sendMessage(tabId, {
+          type: "disable"
+        });
       } catch {
-        // Content script may already be gone (e.g. tab navigated); fine.
+        // Content script may already be gone.
       }
+
       try {
-        await browser.action.setBadgeText({ text: "", tabId });
+        await browser.action.setBadgeText({
+          text: "",
+          tabId: tabId
+        });
       } catch {
-        // ignore
+        // Ignore.
       }
-      return { ok: true };
+
+      return {
+        ok: true
+      };
     }
 
-    // content.js reports counts so we can mirror the number on the
-    // toolbar-icon badge as a secondary confirmation (the primary
-    // indicator is the favicon overlay drawn by content.js itself).
+
     case "countUpdate": {
       if (sender.tab && sender.tab.id != null) {
+
         try {
           await browser.action.setBadgeText({
             text: String(message.count),
-            tabId: sender.tab.id,
+            tabId: sender.tab.id
           });
+
           await browser.action.setBadgeBackgroundColor({
             color: "#c62828",
-            tabId: sender.tab.id,
+            tabId: sender.tab.id
           });
+
         } catch {
-          // ignore
+          // Ignore.
         }
       }
-      return { ok: true };
+
+      return {
+        ok: true
+      };
     }
+
 
     default:
       return;
   }
 });
 
-// ---- Re-establish the counter after a page reload/navigation ----
-// Bugzilla's own page JS periodically calls window.location.reload(true),
-// and the user may also hit refresh manually. Either way, any previously
-// injected content script instance is destroyed. If the tab is still
-// marked enabled AND still points at the same origin we were granted
-// permission for, re-inject automatically.
+
+// ------------------------------------------------------------
+// Re-inject after page reload/navigation
+// ------------------------------------------------------------
+
 browser.webNavigation.onCompleted.addListener(async (details) => {
-  if (details.frameId !== 0) return; // top frame only
+
+  // Only care about the main page.
+  if (details.frameId !== 0) {
+    return;
+  }
 
   const map = await getEnabledTabs();
+
   const entry = map[details.tabId];
-  if (!entry) return;
 
-  const tab = await browser.tabs.get(details.tabId).catch(() => null);
-  if (!tab || !tab.url) return;
+  // This tab wasn't enabled.
+  if (!entry) {
+    return;
+  }
 
+  const tab = await browser.tabs
+    .get(details.tabId)
+    .catch(() => null);
+
+  if (!tab || !tab.url) {
+    return;
+  }
+
+
+  // If the tab moved to another origin, automatically disable it.
   if (!originMatchesTabUrl(entry.origin, tab.url)) {
-    // Navigated to a different site than the one that was enabled.
-    // Auto-disable rather than silently operating without permission
-    // or (worse) failing silently forever.
+
     await markTabDisabled(details.tabId);
+
     try {
-      await browser.action.setBadgeText({ text: "", tabId: details.tabId });
+      await browser.action.setBadgeText({
+        text: "",
+        tabId: details.tabId
+      });
     } catch {
-      // ignore
+      // Ignore.
     }
+
     return;
   }
 
-  const granted = await browser.permissions.contains({ origins: [entry.origin] });
+
+  /*
+   * IMPORTANT FIX:
+   *
+   * The permission was granted as:
+   *
+   *   http://cb.inhouse.net/*
+   *
+   * while the stored origin is:
+   *
+   *   http://cb.inhouse.net
+   *
+   * Therefore we must add /* before checking the permission.
+   */
+  const permissionPattern = getPermissionPattern(entry.origin);
+
+  const granted = await browser.permissions.contains({
+    origins: [
+      permissionPattern
+    ]
+  });
+
   if (!granted) {
+
     await markTabDisabled(details.tabId);
+
+    try {
+      await browser.action.setBadgeText({
+        text: "",
+        tabId: details.tabId
+      });
+    } catch {
+      // Ignore.
+    }
+
     return;
   }
 
+
+  // Page finished loading and permission is still valid.
+  // Re-inject the counter.
   await injectContentScript(details.tabId);
 });
 
-// ---- Cleanup ----
+
+// ------------------------------------------------------------
+// Cleanup when a tab is closed
+// ------------------------------------------------------------
+
 browser.tabs.onRemoved.addListener(async (tabId) => {
   await markTabDisabled(tabId);
 });

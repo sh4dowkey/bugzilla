@@ -1,18 +1,155 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <link rel="stylesheet" href="popup.css" />
-  </head>
-  <body>
-    <h1>Bugzilla NEW Counter</h1>
-    <p id="status" class="status">Checking this tab…</p>
-    <button id="toggle" disabled>Please wait…</button>
-    <p id="error" class="error" hidden></p>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+  <title>Bugzilla Counter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+
+  <header class="header">
+    <div class="logo">B</div>
+
+    <div>
+      <h1>Bugzilla Counter</h1>
+      <p>Bug monitor</p>
+    </div>
+  </header>
+
+
+  <main>
+
+    <section class="status-card">
+
+      <div class="status-row">
+
+        <span
+          id="status-dot"
+          class="status-dot off"
+        ></span>
+
+        <div class="status-info">
+          <strong id="status">
+            Monitoring OFF
+          </strong>
+
+          <span id="status-detail">
+            This tab is not being monitored
+          </span>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <section class="counts-card">
+
+      <div class="count-box new-box">
+
+        <span class="count-label">
+          NEW
+        </span>
+
+        <span
+          id="new-count"
+          class="count-number"
+        >
+          —
+        </span>
+
+        <span class="count-description">
+          New bugs
+        </span>
+
+      </div>
+
+
+      <div class="count-box resp-box">
+
+        <span class="count-label">
+          RESP
+        </span>
+
+        <span
+          id="resp-count"
+          class="count-number"
+        >
+          —
+        </span>
+
+        <span class="count-description">
+          Responded
+        </span>
+
+      </div>
+
+    </section>
+
+
+    <section class="total-card">
+
+      <div>
+        <span class="small-label">
+          TOTAL
+        </span>
+
+        <strong id="total-count">
+          —
+        </strong>
+      </div>
+
+
+      <div class="updated">
+
+        <span class="small-label">
+          UPDATED
+        </span>
+
+        <span id="last-updated">
+          —
+        </span>
+
+      </div>
+
+    </section>
+
+
+    <button
+      id="toggle"
+      class="toggle-button"
+      disabled
+    >
+      Please wait…
+    </button>
+
+
+    <div
+      id="error"
+      class="error"
+      hidden
+    ></div>
+
+
     <p class="hint">
-      Enabling only affects the current tab. Other tabs, including other
-      Bugzilla tabs, are unaffected.
+      Monitoring applies only to this tab.
     </p>
-    <script src="popup.js"></script>
-  </body>
+
+  </main>
+
+
+  <footer>
+    <span>Bugzilla Counter</span>
+    <span>v1.0.1</span>
+  </footer>
+
+
+  <script src="popup.js"></script>
+
+</body>
 </html>

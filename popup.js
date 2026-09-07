@@ -1,139 +1,332 @@
 let currentTab = null;
 
-const statusEl = document.getElementById("status");
-const toggleButton = document.getElementById("toggle");
-const errorEl = document.getElementById("error");
+const statusEl =
+  document.getElementById("status");
+
+const statusDetailEl =
+  document.getElementById("status-detail");
+
+const statusDot =
+  document.getElementById("status-dot");
+
+const newCountEl =
+  document.getElementById("new-count");
+
+const respCountEl =
+  document.getElementById("resp-count");
+
+const totalCountEl =
+  document.getElementById("total-count");
+
+const lastUpdatedEl =
+  document.getElementById("last-updated");
+
+const toggleButton =
+  document.getElementById("toggle");
+
+const errorEl =
+  document.getElementById("error");
+
 
 function showError(message) {
   errorEl.textContent = message;
   errorEl.hidden = false;
+
+  statusDot.className =
+    "status-dot error";
 }
+
 
 function clearError() {
   errorEl.textContent = "";
   errorEl.hidden = true;
 }
 
-function setButton(enabled) {
-  toggleButton.disabled = false;
-  toggleButton.textContent = enabled ? "Disable" : "Enable";
+
+function formatLastUpdated(timestamp) {
+  if (!timestamp) {
+    return "—";
+  }
+
+  const seconds =
+    Math.max(
+      0,
+      Math.floor(
+        (Date.now() - timestamp) /
+          1000
+      )
+    );
+
+  if (seconds < 5) {
+    return "Just now";
+  }
+
+  if (seconds < 60) {
+    return `${seconds}s ago`;
+  }
+
+  const minutes =
+    Math.floor(
+      seconds / 60
+    );
+
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours =
+    Math.floor(
+      minutes / 60
+    );
+
+  return `${hours}h ago`;
 }
+
+
+function renderEnabled(state) {
+  statusDot.className =
+    "status-dot on";
+
+  statusEl.textContent =
+    "Monitoring ON";
+
+  statusDetailEl.textContent =
+    "This tab is being monitored";
+
+  newCountEl.textContent =
+    state.newCount ?? 0;
+
+  respCountEl.textContent =
+    state.respCount ?? 0;
+
+  totalCountEl.textContent =
+    state.totalCount ?? 0;
+
+  lastUpdatedEl.textContent =
+    formatLastUpdated(
+      state.lastUpdated
+    );
+
+  toggleButton.disabled = false;
+
+  toggleButton.textContent =
+    "Disable monitoring";
+
+  toggleButton.classList.add(
+    "disable"
+  );
+}
+
+
+function renderDisabled() {
+  statusDot.className =
+    "status-dot off";
+
+  statusEl.textContent =
+    "Monitoring OFF";
+
+  statusDetailEl.textContent =
+    "This tab is not being monitored";
+
+  newCountEl.textContent = "—";
+  respCountEl.textContent = "—";
+  totalCountEl.textContent = "—";
+
+  lastUpdatedEl.textContent = "—";
+
+  toggleButton.disabled = false;
+
+  toggleButton.textContent =
+    "Enable monitoring";
+
+  toggleButton.classList.remove(
+    "disable"
+  );
+}
+
 
 async function loadState() {
   clearError();
 
-  const tabs = await browser.tabs.query({
-    active: true,
-    currentWindow: true
-  });
+  const tabs =
+    await browser.tabs.query({
+      active: true,
+      currentWindow: true
+    });
 
   currentTab = tabs[0];
 
-  if (!currentTab || !currentTab.id || !currentTab.url) {
-    statusEl.textContent = "This page can't be monitored.";
+  if (
+    !currentTab ||
+    currentTab.id == null ||
+    !currentTab.url
+  ) {
+    statusEl.textContent =
+      "This page can't be monitored.";
+
     toggleButton.disabled = true;
+
     return;
   }
 
-  if (!/^https?:\/\//i.test(currentTab.url)) {
-    statusEl.textContent = "This page can't be monitored.";
+  if (
+    !/^https?:\/\//i.test(
+      currentTab.url
+    )
+  ) {
+    statusEl.textContent =
+      "This page can't be monitored.";
+
+    statusDetailEl.textContent =
+      "Only HTTP/HTTPS pages are supported.";
+
     toggleButton.disabled = true;
+
     return;
   }
 
-  try {
-    const state = await browser.runtime.sendMessage({
+  const state =
+    await browser.runtime.sendMessage({
       type: "getState",
       tabId: currentTab.id
     });
 
-    if (state && state.enabled) {
-      statusEl.textContent = "Enabled for this tab.";
-      setButton(true);
-    } else {
-      statusEl.textContent = "Off for this tab (default).";
-      setButton(false);
-    }
-  } catch (error) {
-    showError(error.message || String(error));
-    toggleButton.disabled = true;
+  if (
+    state &&
+    state.enabled
+  ) {
+    renderEnabled(state);
+  } else {
+    renderDisabled();
   }
 }
 
 
-/*
- * IMPORTANT:
- * The permissions.request() call must happen directly
- * inside the click handler, before any await.
- */
-toggleButton.addEventListener("click", function () {
-  clearError();
+toggleButton.addEventListener(
+  "click",
+  function () {
+    clearError();
 
-  if (!currentTab || !currentTab.id || !currentTab.url) {
-    showError("Unable to determine the current tab.");
-    return;
-  }
+    if (
+      !currentTab ||
+      currentTab.id == null ||
+      !currentTab.url
+    ) {
+      showError(
+        "Unable to determine the current tab."
+      );
 
-  const currentlyEnabled =
-    toggleButton.textContent.trim().toLowerCase() === "disable";
-
-  if (currentlyEnabled) {
-    browser.runtime.sendMessage({
-      type: "disableTab",
-      tabId: currentTab.id
-    }).then(() => {
-      statusEl.textContent = "Off for this tab.";
-      setButton(false);
-    }).catch((error) => {
-      showError(error.message || String(error));
-    });
-
-    return;
-  }
-
-  let origin;
-
-  try {
-    origin = new URL(currentTab.url).origin;
-  } catch (error) {
-    showError("Invalid tab URL.");
-    return;
-  }
-
-  const permissionOrigin = origin + "/*";
-
-  /*
-   * This is intentionally NOT awaited.
-   * Firefox requires permissions.request() to be
-   * called directly from the user click handler.
-   */
-  browser.permissions.request({
-    origins: [permissionOrigin]
-  }).then((granted) => {
-    if (!granted) {
-      showError("Permission was not granted.");
       return;
     }
 
-    return browser.runtime.sendMessage({
-      type: "enableTab",
-      tabId: currentTab.id,
-      origin: origin
-    });
-  }).then((result) => {
-    if (!result) {
+    const currentlyEnabled =
+      toggleButton.classList.contains(
+        "disable"
+      );
+
+    /*
+     * DISABLE
+     */
+
+    if (currentlyEnabled) {
+      browser.runtime
+        .sendMessage({
+          type: "disableTab",
+          tabId: currentTab.id
+        })
+        .then(() => {
+          renderDisabled();
+        })
+        .catch((error) => {
+          showError(
+            error.message ||
+            String(error)
+          );
+        });
+
       return;
     }
 
-    statusEl.textContent = "Enabled for this tab.";
-    setButton(true);
-  }).catch((error) => {
-    showError(error.message || String(error));
-  });
-});
+    /*
+     * ENABLE
+     *
+     * IMPORTANT:
+     *
+     * permissions.request() is called
+     * directly from this click handler.
+     */
+
+    let origin;
+
+    try {
+      origin =
+        new URL(
+          currentTab.url
+        ).origin;
+    } catch {
+      showError(
+        "Invalid tab URL."
+      );
+
+      return;
+    }
+
+    browser.permissions
+      .request({
+        origins: [
+          origin + "/*"
+        ]
+      })
+      .then((granted) => {
+        if (!granted) {
+          showError(
+            "Permission was not granted."
+          );
+
+          return null;
+        }
+
+        return browser.runtime.sendMessage({
+          type: "enableTab",
+
+          tabId:
+            currentTab.id,
+
+          origin
+        });
+      })
+      .then((result) => {
+        if (!result) {
+          return null;
+        }
+
+        return browser.runtime.sendMessage({
+          type: "getState",
+
+          tabId:
+            currentTab.id
+        });
+      })
+      .then((state) => {
+        if (state) {
+          renderEnabled(state);
+        }
+      })
+      .catch((error) => {
+        showError(
+          error.message ||
+          String(error)
+        );
+      });
+  }
+);
 
 
 loadState().catch((error) => {
-  showError(error.message || String(error));
+  showError(
+    error.message ||
+    String(error)
+  );
+
   toggleButton.disabled = true;
 });

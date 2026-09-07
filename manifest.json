@@ -1,16 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Bugzilla Counter",
-  "version": "1.0.0",
-  "description": "Counts bugs with status NEW on a Bugzilla bug-list tab and shows a compact badge on that tab's favicon. Off by default everywhere; must be explicitly enabled per tab.",
+  "version": "1.0.1",
+  "description": "Counts bugs with status NEW and RESP on a Bugzilla bug-list tab and shows the counts on the tab favicon.",
   "browser_specific_settings": {
     "gecko": {
       "id": "bugzilla-new-counter@inhouse.net",
       "strict_min_version": "109.0",
       "data_collection_permissions": {
-        "required": [
-          "none"
-        ]
+        "required": ["none"]
       }
     }
   },
@@ -18,7 +16,9 @@
     "storage",
     "scripting",
     "activeTab",
-    "webNavigation"
+    "webNavigation",
+    "notifications",
+    "alarms"
   ],
   "optional_host_permissions": [
     "https://cb.inhouse.net/*",

@@ -1,5 +1,12 @@
 let currentTab = null;
 
+let pollTimer = null;
+
+let tickTimer = null;
+
+let lastKnownState = null;
+
+
 const statusEl =
   document.getElementById("status");
 
@@ -83,7 +90,37 @@ function formatLastUpdated(timestamp) {
 }
 
 
+/*
+ * Re-render just the "last updated"
+ * relative time without touching
+ * anything else, so it stays fresh
+ * while the popup is open.
+ */
+
+function tickLastUpdated() {
+  if (
+    lastKnownState &&
+    lastKnownState.enabled
+  ) {
+    lastUpdatedEl.textContent =
+      formatLastUpdated(
+        lastKnownState.lastUpdated
+      );
+  }
+}
+
+
+function setSwitch(checked) {
+  toggleButton.setAttribute(
+    "aria-checked",
+    checked ? "true" : "false"
+  );
+}
+
+
 function renderEnabled(state) {
+  lastKnownState = state;
+
   statusDot.className =
     "status-dot on";
 
@@ -109,16 +146,21 @@ function renderEnabled(state) {
 
   toggleButton.disabled = false;
 
-  toggleButton.textContent =
-    "Disable monitoring";
-
-  toggleButton.classList.add(
-    "disable"
+  toggleButton.classList.remove(
+    "pending"
   );
+
+  setSwitch(true);
+
+  startPolling();
 }
 
 
 function renderDisabled() {
+  lastKnownState = {
+    enabled: false
+  };
+
   statusDot.className =
     "status-dot off";
 
@@ -136,12 +178,85 @@ function renderDisabled() {
 
   toggleButton.disabled = false;
 
-  toggleButton.textContent =
-    "Enable monitoring";
-
   toggleButton.classList.remove(
-    "disable"
+    "pending"
   );
+
+  setSwitch(false);
+
+  stopPolling();
+}
+
+
+/*
+ * While monitoring is on and the
+ * popup stays open, keep the counts
+ * and "last updated" text fresh
+ * instead of only reflecting a
+ * single snapshot from load time.
+ */
+
+function startPolling() {
+  stopPolling();
+
+  pollTimer = setInterval(
+    async () => {
+      if (
+        !currentTab ||
+        currentTab.id == null
+      ) {
+        return;
+      }
+
+      try {
+        const state =
+          await browser.runtime.sendMessage({
+            type: "getState",
+            tabId: currentTab.id
+          });
+
+        if (state && state.enabled) {
+          renderCountsOnly(state);
+        } else if (state) {
+          renderDisabled();
+        }
+      } catch {
+        /* popup may be closing */
+      }
+    },
+    3000
+  );
+}
+
+
+function stopPolling() {
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+
+/*
+ * Lighter-weight refresh used by
+ * polling: updates numbers without
+ * re-touching the switch/animations.
+ */
+
+function renderCountsOnly(state) {
+  lastKnownState = state;
+
+  newCountEl.textContent =
+    state.newCount ?? 0;
+
+  respCountEl.textContent =
+    state.respCount ?? 0;
+
+  totalCountEl.textContent =
+    state.totalCount ?? 0;
+
+  lastUpdatedEl.textContent =
+    formatLastUpdated(
+      state.lastUpdated
+    );
 }
 
 
@@ -220,15 +335,18 @@ toggleButton.addEventListener(
     }
 
     const currentlyEnabled =
-      toggleButton.classList.contains(
-        "disable"
-      );
+      toggleButton.getAttribute(
+        "aria-checked"
+      ) === "true";
 
     /*
      * DISABLE
      */
 
     if (currentlyEnabled) {
+      toggleButton.disabled = true;
+      toggleButton.classList.add("pending");
+
       browser.runtime
         .sendMessage({
           type: "disableTab",
@@ -238,6 +356,9 @@ toggleButton.addEventListener(
           renderDisabled();
         })
         .catch((error) => {
+          toggleButton.disabled = false;
+          toggleButton.classList.remove("pending");
+
           showError(
             error.message ||
             String(error)
@@ -253,7 +374,10 @@ toggleButton.addEventListener(
      * IMPORTANT:
      *
      * permissions.request() is called
-     * directly from this click handler.
+     * directly from this click handler,
+     * synchronously in response to the
+     * user gesture. Do not move this
+     * behind an await/async boundary.
      */
 
     let origin;
@@ -271,6 +395,8 @@ toggleButton.addEventListener(
       return;
     }
 
+    toggleButton.classList.add("pending");
+
     browser.permissions
       .request({
         origins: [
@@ -282,6 +408,8 @@ toggleButton.addEventListener(
           showError(
             "Permission was not granted."
           );
+
+          toggleButton.classList.remove("pending");
 
           return null;
         }
@@ -310,9 +438,13 @@ toggleButton.addEventListener(
       .then((state) => {
         if (state) {
           renderEnabled(state);
+        } else {
+          toggleButton.classList.remove("pending");
         }
       })
       .catch((error) => {
+        toggleButton.classList.remove("pending");
+
         showError(
           error.message ||
           String(error)
@@ -330,3 +462,18 @@ loadState().catch((error) => {
 
   toggleButton.disabled = true;
 });
+
+
+tickTimer = setInterval(
+  tickLastUpdated,
+  5000
+);
+
+window.addEventListener(
+  "unload",
+  () => {
+    stopPolling();
+
+    clearInterval(tickTimer);
+  }
+);

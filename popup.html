@@ -13,7 +13,7 @@
 <body>
 
   <header class="header">
-    <div class="logo">B</div>
+    <img class="logo" src="icon.svg" alt="" width="34" height="34">
 
     <div>
       <h1>Bugzilla Counter</h1>
@@ -24,109 +24,66 @@
 
   <main>
 
-    <section class="status-card">
+    <section class="switch-card">
 
-      <div class="status-row">
-
-        <span
-          id="status-dot"
-          class="status-dot off"
-        ></span>
-
-        <div class="status-info">
-          <strong id="status">
-            Monitoring OFF
-          </strong>
-
-          <span id="status-detail">
-            This tab is not being monitored
-          </span>
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <section class="counts-card">
-
-      <div class="count-box new-box">
-
-        <span class="count-label">
-          NEW
-        </span>
-
-        <span
-          id="new-count"
-          class="count-number"
-        >
-          —
-        </span>
-
-        <span class="count-description">
-          New bugs
-        </span>
-
-      </div>
-
-
-      <div class="count-box resp-box">
-
-        <span class="count-label">
-          RESP
-        </span>
-
-        <span
-          id="resp-count"
-          class="count-number"
-        >
-          —
-        </span>
-
-        <span class="count-description">
-          Responded
-        </span>
-
-      </div>
-
-    </section>
-
-
-    <section class="total-card">
-
-      <div>
-        <span class="small-label">
-          TOTAL
-        </span>
-
-        <strong id="total-count">
-          —
+      <div class="status-info">
+        <strong id="status">
+          Monitoring OFF
         </strong>
+
+        <span id="status-detail">
+          This tab is not being monitored
+        </span>
       </div>
 
-
-      <div class="updated">
-
-        <span class="small-label">
-          UPDATED
+      <button
+        id="toggle"
+        class="switch"
+        role="switch"
+        aria-checked="false"
+        aria-label="Toggle monitoring for this tab"
+        disabled
+      >
+        <span class="switch-track">
+          <span class="switch-thumb"></span>
         </span>
+      </button>
 
-        <span id="last-updated">
-          —
-        </span>
+    </section>
 
+
+    <section class="counts-row">
+
+      <div class="count-item new-item">
+        <span class="count-number" id="new-count">—</span>
+        <span class="count-label">NEW</span>
+      </div>
+
+      <div class="count-divider"></div>
+
+      <div class="count-item resp-item">
+        <span class="count-number" id="resp-count">—</span>
+        <span class="count-label">RESP</span>
+      </div>
+
+      <div class="count-divider"></div>
+
+      <div class="count-item total-item">
+        <span class="count-number" id="total-count">—</span>
+        <span class="count-label">TOTAL</span>
       </div>
 
     </section>
 
 
-    <button
-      id="toggle"
-      class="toggle-button"
-      disabled
-    >
-      Please wait…
-    </button>
+    <div class="updated-row">
+      <span
+        id="status-dot"
+        class="status-dot off"
+      ></span>
+      <span class="small-label">UPDATED</span>
+      <span id="last-updated">—</span>
+    </div>
 
 
     <div
@@ -145,7 +102,7 @@
 
   <footer>
     <span>Bugzilla Counter</span>
-    <span>v1.0.1</span>
+    <span>v1.0.2</span>
   </footer>
 
 

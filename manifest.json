@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bugzilla Counter",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Counts bugs with status NEW and RESP on a Bugzilla bug-list tab and shows the counts on the tab favicon.",
   "browser_specific_settings": {
     "gecko": {
@@ -28,7 +28,9 @@
     "default_popup": "popup.html",
     "default_title": "Bugzilla Counter",
     "default_icon": {
-      "32": "icon.svg"
+      "16": "icon.svg",
+      "32": "icon.svg",
+      "48": "icon.svg"
     }
   },
   "background": {
@@ -37,6 +39,9 @@
     ]
   },
   "icons": {
-    "32": "icon.svg"
+    "16": "icon.svg",
+    "32": "icon.svg",
+    "48": "icon.svg",
+    "128": "icon.svg"
   }
 }

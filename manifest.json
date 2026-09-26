@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Bugzilla Counter",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Counts bugs with status NEW and RESP on a Bugzilla bug-list tab and shows the counts on the tab favicon.",
   "browser_specific_settings": {
     "gecko": {
       "id": "bugzilla-new-counter@inhouse.net",
       "strict_min_version": "109.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   },
@@ -19,6 +21,9 @@
     "webNavigation",
     "notifications",
     "alarms"
+  ],
+  "host_permissions": [
+    "https://bugzilla-notify-api.anant-pandey017.workers.dev/*"
   ],
   "optional_host_permissions": [
     "https://cb.inhouse.net/*",

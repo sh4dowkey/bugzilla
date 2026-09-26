@@ -2,154 +2,100 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1"
-  >
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bugzilla Counter</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-
 <body>
-
   <header class="header">
-    <div class="logo">B</div>
-
+    <div class="logo">BC</div>
     <div>
       <h1>Bugzilla Counter</h1>
       <p>Bug monitor</p>
     </div>
   </header>
 
-
   <main>
-
     <section class="status-card">
-
       <div class="status-row">
-
-        <span
-          id="status-dot"
-          class="status-dot off"
-        ></span>
-
+        <span id="status-dot" class="status-dot off"></span>
         <div class="status-info">
-          <strong id="status">
-            Monitoring OFF
-          </strong>
-
-          <span id="status-detail">
-            This tab is not being monitored
-          </span>
+          <strong id="status">Monitoring OFF</strong>
+          <span id="status-detail">This tab is not being monitored</span>
         </div>
-
+        <button id="toggle" class="switch monitor-switch" type="button" aria-label="Toggle monitoring" disabled>
+          <span></span>
+        </button>
       </div>
-
     </section>
-
 
     <section class="counts-card">
-
       <div class="count-box new-box">
-
-        <span class="count-label">
-          NEW
-        </span>
-
-        <span
-          id="new-count"
-          class="count-number"
-        >
-          —
-        </span>
-
-        <span class="count-description">
-          New bugs
-        </span>
-
+        <span class="count-label">NEW</span>
+        <span id="new-count" class="count-number">—</span>
+        <span class="count-description">New bugs</span>
       </div>
-
-
       <div class="count-box resp-box">
-
-        <span class="count-label">
-          RESP
-        </span>
-
-        <span
-          id="resp-count"
-          class="count-number"
-        >
-          —
-        </span>
-
-        <span class="count-description">
-          Responded
-        </span>
-
+        <span class="count-label">RESP</span>
+        <span id="resp-count" class="count-number">—</span>
+        <span class="count-description">Responded</span>
       </div>
-
     </section>
-
 
     <section class="total-card">
-
       <div>
-        <span class="small-label">
-          TOTAL
-        </span>
-
-        <strong id="total-count">
-          —
-        </strong>
+        <span class="small-label">TOTAL</span>
+        <strong id="total-count">—</strong>
       </div>
-
-
       <div class="updated">
-
-        <span class="small-label">
-          UPDATED
-        </span>
-
-        <span id="last-updated">
-          —
-        </span>
-
+        <span class="small-label">UPDATED</span>
+        <span id="last-updated">—</span>
       </div>
-
     </section>
 
 
-    <button
-      id="toggle"
-      class="toggle-button"
-      disabled
-    >
-      Please wait…
-    </button>
+    <section class="away-card" id="away-card">
+      <button id="away-header" class="away-header" type="button" aria-expanded="false">
+        <div>
+          <strong>Away Mode</strong>
+          <span>Phone alerts while you're away</span>
+        </div>
+        <span id="away-chevron" class="away-chevron">›</span>
+      </button>
 
+      <div id="away-content" class="away-content" hidden>
+        <div id="pairing-status" class="pairing-status">Phone not paired</div>
 
-    <div
-      id="error"
-      class="error"
-      hidden
-    ></div>
+        <div id="pairing-section">
+          <div class="pair-row">
+            <input
+              id="pairing-code"
+              type="text"
+              inputmode="numeric"
+              maxlength="6"
+              autocomplete="off"
+              placeholder="6-digit phone code"
+            >
+            <button id="pair-button" type="button">Pair</button>
+          </div>
+          <p class="pair-hint">Generate a 6-digit code in the phone app, then enter it here. Away Mode turns on automatically after pairing.</p>
+        </div>
 
+        <button id="unpair-button" class="unpair-button" type="button" hidden>
+          Unpair phone
+        </button>
+      </div>
+    </section>
 
-    <p class="hint">
-      Monitoring applies only to this tab.
-    </p>
-
+    <div id="error" class="error" hidden></div>
+    <p class="hint">Monitoring applies only to this tab.</p>
   </main>
-
 
   <footer>
     <span>Bugzilla Counter</span>
-    <span>v1.0.1</span>
+    <span>v1.0.3</span>
   </footer>
 
-
   <script src="popup.js"></script>
-
 </body>
 </html>
